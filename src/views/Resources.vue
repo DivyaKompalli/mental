@@ -15,7 +15,7 @@
           <p>Evidence-based information about mental health conditions and treatments</p>
         </div>
         <div class="resource-list">
-          <div v-for="(article, index) in articles" :key="index" class="resource-card">
+          <div v-for="(article, index) in articles" :key="`article-${index}`" class="resource-card">
             <div class="card-icon"><i class="fas fa-file-alt"></i></div>
             <div class="card-content">
               <h3>{{ article.title }}</h3>
@@ -40,7 +40,7 @@
           <p>Visual resources for relaxation, meditation, and self-help techniques</p>
         </div>
         <div class="resource-list">
-          <div v-for="(video, index) in videos" :key="index" class="resource-card">
+          <div v-for="(video, index) in videos" :key="`video-${index}`" class="resource-card">
             <div class="card-icon"><i class="fas fa-play-circle"></i></div>
             <div class="card-content">
               <h3>{{ video.title }}</h3>
@@ -58,16 +58,17 @@
         </div>
       </section>
 
-      <!-- Hotlines Section -->
+      <!-- Support Services Section -->
       <section class="category emergency-section">
         <div class="category-header">
-          <h2><i class="fas fa-phone-alt"></i> Immediate Support</h2>
-          <p>24/7 crisis support and mental health hotlines</p>
+          <h2><i class="fas fa-phone-alt"></i> Support Services</h2>
+          <p>24/7 crisis support and mental health organizations</p>
         </div>
         <div class="resource-list">
+          <!-- Hotlines -->
           <div
             v-for="(hotline, index) in hotlines"
-            :key="index"
+            :key="`hotline-${index}`"
             class="resource-card emergency-card"
           >
             <div class="card-icon"><i class="fas fa-life-ring"></i></div>
@@ -80,6 +81,27 @@
                 </a>
                 <span class="availability"
                   ><i class="fas fa-check-circle"></i> {{ hotline.availability }}</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- NGOs -->
+          <div
+            v-for="(ngo, index) in ngos"
+            :key="`ngo-${index}`"
+            class="resource-card emergency-card"
+          >
+            <div class="card-icon"><i class="fas fa-hands-helping"></i></div>
+            <div class="card-content">
+              <h3>{{ ngo.title }}</h3>
+              <p>{{ ngo.description }}</p>
+              <div class="card-footer">
+                <a :href="ngo.link" target="_blank" class="emergency-link">
+                  <i class="fas fa-external-link-alt"></i> Visit Website
+                </a>
+                <span class="availability"
+                  ><i class="fas fa-check-circle"></i> {{ ngo.availability }}</span
                 >
               </div>
             </div>
@@ -156,6 +178,15 @@ export default {
           name: 'SAMHSA Treatment Referral',
           description: 'National helpline for substance abuse and mental health services.',
           number: '1-800-662-4357',
+          availability: '24/7',
+        },
+      ],
+      ngos: [
+        {
+          title: 'Live Love Laugh Foundation',
+          description:
+            'A Non-Profit Organization that aims to promote mental health and wellbeing.',
+          link: 'https://www.thelivelovelaughfoundation.org/find-help/therapist',
           availability: '24/7',
         },
       ],
@@ -280,6 +311,11 @@ export default {
   font-size: 1.75rem;
   color: var(--primary-color);
   margin-top: 0.25rem;
+}
+
+/* NGO specific icon color */
+.resource-card.emergency-card .fa-hands-helping {
+  color: #6a1b9a;
 }
 
 .card-content {
