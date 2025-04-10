@@ -1,6 +1,7 @@
 <template>
   <div class="emotion-sculptor">
     <!-- VR Mode Toggle -->
+
     <div class="vr-toggle">
       <button @click="toggleVR" :disabled="!isWebXRAvailable">
         {{ vrMode ? 'Exit VR' : 'Enter VR' }}
@@ -14,6 +15,7 @@
       <div ref="canvasContainer" class="canvas-container"></div>
 
       <div class="controls">
+        <!-- <img src="../assets/images/sculpture.jpg" alt="Logo" class="logo" /> -->
         <div class="emotion-palette">
           <div
             v-for="emotion in enhancedEmotions"
@@ -484,6 +486,7 @@ export default {
 
 .vr-toggle button:disabled {
   background: #cccccc;
+
   cursor: not-allowed;
 }
 
@@ -517,7 +520,8 @@ export default {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, #a55454 0%, #863434 100%);
+  /* background-image: url('../assets/images/sculpture.jpg'); */
 }
 
 .controls {

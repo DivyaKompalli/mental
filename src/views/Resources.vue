@@ -122,20 +122,20 @@ export default {
         {
           title: '10-Minute Mindfulness Meditation',
           description: 'Guided meditation session to help calm your mind and reduce anxiety.',
-          link: 'https://www.youtube.com/watch?v=example1',
+          link: 'https://youtu.be/5DIRRfoMYJA?si=gbovcDHjxuMX5kK0',
           duration: '10:22',
         },
         {
           title: 'Breathing Techniques for Anxiety',
           description:
             'Learn four powerful breathing exercises to manage panic attacks and anxiety.',
-          link: 'https://www.youtube.com/watch?v=example2',
+          link: 'https://youtu.be/ngMP4CtUQ8k?si=-Zdi1ti6IKDGnYNx',
           duration: '7:45',
         },
         {
           title: 'Cognitive Behavioral Therapy Basics',
           description: 'Introduction to CBT techniques you can practice at home.',
-          link: 'https://www.youtube.com/watch?v=example3',
+          link: 'https://youtu.be/5DIRRfoMYJA?si=gbovcDHjxuMX5kK0',
           duration: '14:30',
         },
       ],

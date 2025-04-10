@@ -1,250 +1,385 @@
 <template>
-  <div class="mood-tracker-view">
-    <h1>Mood Tracker</h1>
+  <div class="mood-tracker-container">
+    <h2 class="tracker-title">Mood Tracker</h2>
 
-    <div class="mood-tracker-container">
-      <div class="mood-input-section">
-        <h2>How are you feeling today?</h2>
-        <MoodSelector @mood-selected="handleMoodSelection" />
+    <div class="input-section">
+      <textarea
+        v-model="userInput"
+        placeholder="How are you feeling today? Share your thoughts..."
+        class="mood-textarea"
+        ref="textInput"
+      ></textarea>
 
-        <div v-if="selectedMood" class="mood-note-section">
-          <textarea
-            v-model="moodNote"
-            placeholder="Add a note about your mood (optional)"
-          ></textarea>
-          <button @click="saveMoodEntry" class="save-btn">Save Mood Entry</button>
-        </div>
-      </div>
+      <VoiceInput @transcript="handleVoiceInput" @error="handleVoiceError" class="voice-input" />
 
-      <div class="mood-history-section">
-        <h2>Your Mood History</h2>
+      <div class="action-buttons">
+        <button @click="analyzeMood" :disabled="!userInput.trim() || isLoading" class="analyze-btn">
+          <span v-if="!isLoading">Analyze Mood</span>
+          <span v-else>Analyzing...</span>
+        </button>
 
-        <div v-if="moodEntries.length === 0" class="empty-state">
-          <i class="fas fa-chart-line"></i>
-          <p>No mood entries yet. Track your first mood!</p>
-        </div>
-
-        <div v-else>
-          <div class="mood-stats">
-            <div class="stat-card">
-              <h3>Most Common Mood</h3>
-              <div class="stat-value">
-                <i :class="mostCommonMoodIcon"></i>
-                <span>{{ mostCommonMoodLabel }}</span>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <h3>Entries This Week</h3>
-              <div class="stat-value">
-                {{ weeklyEntriesCount }}
-              </div>
-            </div>
-          </div>
-
-          <MoodHistoryChart :entries="moodEntries" />
-
-          <div class="mood-entries-list">
-            <div
-              v-for="entry in moodEntries"
-              :key="entry.id"
-              class="mood-entry"
-              :style="{ borderLeft: `4px solid ${getMoodColor(entry.mood)}` }"
-            >
-              <div class="entry-mood">
-                <i :class="getMoodIcon(entry.mood)"></i>
-                <span>{{ getMoodLabel(entry.mood) }}</span>
-              </div>
-              <div class="entry-date">
-                {{ formatDateTime(entry.createdAt) }}
-              </div>
-              <div v-if="entry.note" class="entry-note">
-                {{ entry.note }}
-              </div>
-              <button @click="deleteMoodEntry(entry.id)" class="delete-btn">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        </div>
+        <button v-if="userInput.trim()" @click="clearInput" class="clear-btn">Clear</button>
       </div>
     </div>
+
+    <div v-if="analysisResult" class="results-section">
+      <div class="sentiment-display" :class="analysisResult.sentiment.toLowerCase()">
+        <h3>Your Mood:</h3>
+        <div class="sentiment-info">
+          <span class="sentiment-label">{{ analysisResult.sentiment }}</span>
+          <span class="confidence">({{ analysisResult.confidence }}% confidence)</span>
+        </div>
+
+        <div class="suggestions-container">
+          <h4>Suggestions:</h4>
+          <ul class="suggestions-list">
+            <li v-for="(suggestion, index) in suggestions" :key="index">
+              <i class="fas fa-lightbulb suggestion-icon"></i>
+              {{ suggestion }}
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button @click="saveToJournal" class="save-btn">
+          <i class="fas fa-book"></i> Save to Journal
+        </button>
+        <button @click="trySuggestion" class="try-btn">
+          <i class="fas fa-play"></i> Try Suggestion
+        </button>
+      </div>
+    </div>
+
+    <MobileFeedback ref="feedback" />
   </div>
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex'
-import {
-  getMoodIcon,
-  getMoodLabel,
-  getMoodColor,
-  formatDate,
-  formatDateTime,
-} from '../utils/helpers'
-import MoodSelector from '../components/Common/MoodSelector.vue'
-import MoodHistoryChart from '../components/Common/MoodHistoryChart.vue'
+import { analyzeSentiment, generateSuggestions } from '../services/sentiment'
+import VoiceInput from '../components/VoiceInput.vue'
+import MobileFeedback from '../components/MobileFeedback.vue'
 
 export default {
-  name: 'MoodTracker',
   components: {
-    MoodSelector,
-    MoodHistoryChart,
+    VoiceInput,
+    MobileFeedback,
   },
   data() {
     return {
-      selectedMood: null,
-      moodNote: '',
+      userInput: '',
+      analysisResult: null,
+      suggestions: [],
+      isLoading: false,
+      lastAnalysis: null,
     }
-  },
-  computed: {
-    ...mapState(['moodEntries', 'currentUser']),
-    mostCommonMood() {
-      if (this.moodEntries.length === 0) return null
-
-      const moodCounts = {}
-      this.moodEntries.forEach((entry) => {
-        moodCounts[entry.mood] = (moodCounts[entry.mood] || 0) + 1
-      })
-
-      return Object.keys(moodCounts).reduce((a, b) => (moodCounts[a] > moodCounts[b] ? a : b))
-    },
-    mostCommonMoodIcon() {
-      return getMoodIcon(this.mostCommonMood)
-    },
-    mostCommonMoodLabel() {
-      return getMoodLabel(this.mostCommonMood)
-    },
-    weeklyEntriesCount() {
-      const oneWeekAgo = new Date()
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-
-      return this.moodEntries.filter((entry) => new Date(entry.createdAt) > oneWeekAgo).length
-    },
-  },
-  created() {
-    this.fetchMoodEntries()
   },
   methods: {
-    ...mapActions(['fetchMoodEntries', 'addMoodEntry', 'deleteMoodEntry']),
-    getMoodIcon,
-    getMoodLabel,
-    getMoodColor,
-    formatDate,
-    formatDateTime,
-    handleMoodSelection(mood) {
-      this.selectedMood = mood
-    },
-    async saveMoodEntry() {
+    async analyzeMood() {
+      if (!this.userInput.trim()) return
+
+      this.isLoading = true
       try {
-        await this.addMoodEntry({
-          mood: this.selectedMood,
-          note: this.moodNote,
-        })
-        this.$toast.success('Mood entry saved successfully!')
-        this.selectedMood = null
-        this.moodNote = ''
+        // Check if we already analyzed this exact text
+        if (this.lastAnalysis && this.lastAnalysis.text === this.userInput) {
+          this.analysisResult = this.lastAnalysis.result
+          this.suggestions = this.lastAnalysis.suggestions
+          return
+        }
+
+        const result = await analyzeSentiment(this.userInput)
+        this.analysisResult = result
+        this.suggestions = generateSuggestions(result.sentiment, result.confidence)
+
+        // Cache the result
+        this.lastAnalysis = {
+          text: this.userInput,
+          result: this.analysisResult,
+          suggestions: this.suggestions,
+        }
+
+        // Show feedback
+        this.$refs.feedback.show(
+          `Detected ${result.sentiment.toLowerCase()} mood`,
+          result.sentiment === 'NEGATIVE' ? 'warning' : 'info',
+        )
       } catch (error) {
-        this.$toast.error('Failed to save mood entry')
+        console.error('Analysis failed:', error)
+        this.$refs.feedback.show('Analysis failed. Please try again.', 'error')
+      } finally {
+        this.isLoading = false
       }
     },
-    async deleteMoodEntry(entryId) {
-      try {
-        await this.deleteMoodEntry(entryId)
-        this.$toast.success('Mood entry deleted successfully!')
-      } catch (error) {
-        this.$toast.error('Failed to delete mood entry')
+    handleVoiceInput(transcript) {
+      this.userInput = transcript
+      this.$refs.textInput.focus()
+      this.$nextTick(() => {
+        this.analyzeMood()
+      })
+    },
+    handleVoiceError(error) {
+      this.$refs.feedback.show('Voice input failed: ' + error, 'error')
+    },
+    clearInput() {
+      this.userInput = ''
+      this.analysisResult = null
+      this.lastAnalysis = null
+      this.$refs.textInput.focus()
+    },
+    saveToJournal() {
+      if (!this.analysisResult) return
+
+      const entry = {
+        text: this.userInput,
+        sentiment: this.analysisResult,
+        date: new Date().toISOString(),
+      }
+
+      this.$store.dispatch('journal/addEntry', entry)
+      this.$refs.feedback.show('Entry saved to journal', 'success')
+      this.clearInput()
+    },
+    trySuggestion() {
+      if (!this.suggestions.length) return
+
+      // Simple routing based on first suggestion
+      const firstSuggestion = this.suggestions[0].toLowerCase()
+
+      if (firstSuggestion.includes('breathing')) {
+        this.$router.push('/exercises/breathing')
+      } else if (firstSuggestion.includes('journal')) {
+        this.$router.push('/journal')
+      } else if (firstSuggestion.includes('rage')) {
+        this.$router.push('/exercises/rage-room')
+      } else {
+        this.$router.push('/exercises')
       }
     },
-    async saveToFirebase(entry) {
-      const db = getFirestore()
-      try {
-        await addDoc(collection(db, 'moodEntries'), entry)
-      } catch (error) {
-        console.error('Firebase error:', error)
-        throw new Error('Failed to save mood entry') // Re-throw with user-friendly message
-      }
-    },
-    // In your component
   },
-}
-import { ref } from 'vue'
-import { useStore } from 'vuex'
-import { useToast } from 'vue-toastification'
-
-const store = useStore()
-const toast = useToast()
-
-const selectedMood = ref('')
-const moodNote = ref('')
-const errorMessage = ref('')
-
-const saveMood = async () => {
-  try {
-    if (!selectedMood.value) {
-      throw new Error('Please select a mood')
-    }
-
-    await store.dispatch('addMoodEntry', {
-      mood: selectedMood.value,
-      note: moodNote.value,
-    })
-
-    // Reset form
-    selectedMood.value = ''
-    moodNote.value = ''
-    errorMessage.value = ''
-
-    toast.success('Mood saved successfully!')
-  } catch (error) {
-    errorMessage.value = error.message
-    toast.error(error.message)
-  }
 }
 </script>
 
 <style scoped>
-.mood-tracker-view {
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
 .mood-tracker-container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2rem;
-}
-
-.mood-input-section,
-.mood-history-section {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-}
-
-.mood-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin: 1.5rem 0;
-}
-
-.mood-entries-list {
-  margin-top: 1.5rem;
-}
-
-.mood-entry {
-  padding: 1rem;
-  margin-bottom: 1rem;
-  border-left: 4px solid;
-}
-
-.animation-container {
+  max-width: 800px;
   margin: 0 auto;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-@media (min-width: 992px) {
+.tracker-title {
+  text-align: center;
+  color: #333;
+  margin-bottom: 25px;
+  font-weight: 600;
+}
+
+.input-section {
+  background: #f9f9f9;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.mood-textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  resize: vertical;
+  margin-bottom: 15px;
+  transition: border-color 0.3s;
+}
+
+.mood-textarea:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+}
+
+.voice-input {
+  margin: 10px 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.analyze-btn {
+  background: linear-gradient(135deg, #4285f4, #34a853);
+  color: white;
+  flex: 1;
+}
+
+.analyze-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
+}
+
+.clear-btn {
+  background: #f1f1f1;
+  color: #666;
+}
+
+.clear-btn:hover {
+  background: #e0e0e0;
+}
+
+.results-section {
+  margin-top: 30px;
+  animation: fadeIn 0.5s ease;
+}
+
+.sentiment-display {
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+}
+
+.sentiment-display.positive {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-left: 6px solid #4caf50;
+}
+
+.sentiment-display.negative {
+  background: linear-gradient(135deg, #ffebee, #ffcdd2);
+  border-left: 6px solid #f44336;
+}
+
+.sentiment-display.neutral {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  border-left: 6px solid #2196f3;
+}
+
+.sentiment-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 20px;
+}
+
+.sentiment-label {
+  font-size: 24px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.confidence {
+  font-size: 14px;
+  color: #666;
+}
+
+.suggestions-container {
+  background: rgba(255, 255, 255, 0.7);
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.suggestions-list {
+  padding-left: 20px;
+  margin-top: 10px;
+}
+
+.suggestions-list li {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.suggestion-icon {
+  color: #ffc107;
+  margin-right: 8px;
+}
+
+.result-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.save-btn {
+  background: #5c6bc0;
+  color: white;
+  flex: 1;
+}
+
+.save-btn:hover {
+  background: #3f51b5;
+}
+
+.try-btn {
+  background: #26a69a;
+  color: white;
+  flex: 1;
+}
+
+.try-btn:hover {
+  background: #00897b;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
   .mood-tracker-container {
-    grid-template-columns: 1fr 1fr;
+    padding: 15px;
+  }
+
+  .action-buttons,
+  .result-actions {
+    flex-direction: column;
+  }
+
+  button {
+    width: 100%;
+  }
+
+  .mood-textarea {
+    min-height: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tracker-title {
+    font-size: 22px;
+  }
+
+  .sentiment-label {
+    font-size: 20px;
+  }
+
+  .suggestions-container {
+    padding: 10px;
   }
 }
 </style>
