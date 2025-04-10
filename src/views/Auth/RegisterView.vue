@@ -12,7 +12,7 @@
       </div> -->
     </div>
     <div class="auth-image">
-      <img src="../assets/images/auth-bg-2.jpg" alt="Mental Health" />
+      <img src="../assets/images/login.jpg" alt="Mental Health" />
     </div>
   </div>
 </template>
